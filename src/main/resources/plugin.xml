@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?eclipse version="3.0"?>
+
+<plugin>
+  <extension id="TBoxExplorationTab" point="org.protege.editor.core.application.WorkspaceTab">
+    <label value="TBox Exploration Tab"/>
+    <class value="de.tudresden.inf.lat.tboxexploration.TBoxExplorationTab"/>
+    <index value="Y"/>
+    <editorKitId value="OWLEditorKit"/>
+    <defaultViewConfigFileName value="viewconfig-TBoxExplorationTab.xml"/>
+  </extension>
+  <extension id="TBoxExplorationViewComponent" point="org.protege.editor.core.application.ViewComponent">
+    <label value="TBox Exploration View Component" />
+    <class value="de.tudresden.inf.lat.tboxexploration.TBoxExplorationViewComponent" />
+    <headerColor value="@org.protege.ontologycolor"/>
+    <category value="@org.protege.ontologycategory" />
+  </extension>
+</plugin>

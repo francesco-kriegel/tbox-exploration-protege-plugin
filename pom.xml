@@ -1,0 +1,257 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>de.tu-dresden.inf.lat</groupId>
+  <artifactId>tbox-exploration-protege-plugin</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>bundle</packaging>
+  <inceptionYear>2019</inceptionYear>
+  <url>https://github.com/francesco-kriegel/tbox-exploration-protege-plugin</url>
+
+  <name>TBox Exploration Protégé Plugin</name>
+
+  <contributors>
+    <contributor>
+      <name>Francesco Kriegel</name>
+      <organization>Technische Universität Dresden</organization>
+      <organizationUrl>https://tu-dresden.de</organizationUrl>
+      <email>francesco.kriegel@tu-dresden.de</email>
+      <url>https://tu-dresden.de/ing/informatik/thi/lat/die-professur/beschaeftigte/francesco-kriegel/</url>
+    </contributor>
+  </contributors>
+
+  <developers>
+    <developer>
+      <name>Francesco Kriegel</name>
+      <organization>Technische Universität Dresden</organization>
+      <organizationUrl>https://tu-dresden.de</organizationUrl>
+      <email>francesco.kriegel@tu-dresden.de</email>
+      <url>https://tu-dresden.de/ing/informatik/thi/lat/die-professur/beschaeftigte/francesco-kriegel/</url>
+    </developer>
+  </developers>
+
+  <!-- <organization> -->
+  <!-- workaround for the license-maven-plugin -->
+  <!-- <name>Francesco Kriegel</name> -->
+  <!-- </organization> -->
+
+  <licenses>
+    <license>
+      <name>GNU GENERAL PUBLIC LICENSE Version 3</name>
+      <url>https://www.gnu.org/licenses/gpl-3.0.html</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <downloadSources>true</downloadSources>
+    <downloadJavadocs>true</downloadJavadocs>
+  </properties>
+
+  <scm>
+    <url>https://github.com/francesco-kriegel/tbox-exploration-protege-plugin/</url>
+    <connection>scm:git:git@github.com:francesco-kriegel/tbox-exploration-protege-plugin.git</connection>
+    <developerConnection>scm:git:git@github.com:francesco-kriegel/tbox-exploration-protege-plugin.git</developerConnection>
+  </scm>
+
+  <issueManagement>
+    <system>github</system>
+    <url>https://github.com/francesco-kriegel/tbox-exploration-protege-plugin/issues/</url>
+  </issueManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>edu.stanford.protege</groupId>
+      <artifactId>protege-editor-owl</artifactId>
+      <version>5.5.0</version>
+      <scope>provided</scope>
+      <exclusions>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>me.kriegel.francesco</groupId>
+      <artifactId>conexp-fx</artifactId>
+      <version>5.5.1-SNAPSHOT</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.guava</groupId>
+          <artifactId>guava</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.scala-lang</groupId>
+          <artifactId>scala-library</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.scala-lang.modules</groupId>
+          <artifactId>scala-parser-combinators_2.12</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>net.sourceforge.owlapi</groupId>
+          <artifactId>owlapi-distribution</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.jena</groupId>
+          <artifactId>apache-jena-libs</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala-library</artifactId>
+      <version>2.12.9</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.felix</groupId>
+          <artifactId>maven-bundle-plugin</artifactId>
+          <version>4.2.0</version>
+          <extensions>true</extensions>
+          <configuration>
+            <instructions>
+              <Bundle-Activator>org.protege.editor.owl.ProtegeOWL</Bundle-Activator>
+              <Bundle-ClassPath>.</Bundle-ClassPath>
+              <Bundle-SymbolicName>${project.artifactId};singleton:=true</Bundle-SymbolicName>
+              <Bundle-Vendor>The Protege Development Team</Bundle-Vendor>
+              <Import-Package>
+                <!-- org.protege.editor.owl.*;version="5.5.0", -->
+                *;resolution:=optional
+              </Import-Package>
+              <!-- <_exportcontents> -->
+              <!-- conexp.fx.core.dl.*, -->
+              <!-- </_exportcontents> -->
+              <Embed-Dependency>
+                conexp-fx,
+                *;scope=compile|runtime
+              </Embed-Dependency>
+              <Embed-Transitive>true</Embed-Transitive>
+            </instructions>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-eclipse-plugin</artifactId>
+          <version>2.10</version>
+          <configuration>
+            <pde>true</pde>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>license-maven-plugin</artifactId>
+          <version>2.0.0</version>
+          <configuration>
+            <verbose>false</verbose>
+            <addSvnKeyWords>false</addSvnKeyWords>
+            <licenseName>gpl_v3</licenseName>
+            <licenseResolver>${project.baseUri}/src/main/deploy/license</licenseResolver>
+            <force>true</force>
+            <canUpdateDescription>true</canUpdateDescription>
+            <canUpdateCopyright>true</canUpdateCopyright>
+            <canUpdateLicense>true</canUpdateLicense>
+            <roots>
+              <root>src/main/java</root>
+              <root>src/test/java</root>
+            </roots>
+          </configuration>
+          <executions>
+            <execution>
+              <id>add-license-headers</id>
+              <phase>process-sources</phase>
+              <goals>
+                <goal>update-file-header</goal>
+                <goal>update-project-license</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>net.alchim31.maven</groupId>
+          <artifactId>scala-maven-plugin</artifactId>
+          <version>4.1.1</version>
+          <executions>
+            <execution>
+              <id>scala-compile-first</id>
+              <phase>process-resources</phase>
+              <!-- <phase>compile</phase> -->
+              <goals>
+                <goal>add-source</goal>
+                <goal>compile</goal>
+              </goals>
+              <configuration>
+                <args>
+                  <!-- <arg>-make:transitive</arg> -->
+                  <arg>-dependencyfile</arg>
+                  <arg>${project.build.directory}/.scala_dependencies</arg>
+                </args>
+              </configuration>
+            </execution>
+            <execution>
+              <id>scala-test-compile</id>
+              <phase>process-test-resources</phase>
+              <!-- <phase>test-compile</phase> -->
+              <goals>
+                <goal>testCompile</goal>
+              </goals>
+              <configuration>
+                <args>
+                  <!-- <arg>-make:transitive</arg> -->
+                  <arg>-dependencyfile</arg>
+                  <arg>${project.build.directory}/.scala_dependencies</arg>
+                </args>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.8.1</version>
+          <configuration>
+            <source>1.8</source>
+            <target>1.8</target>
+            <encoding>${project.build.sourceEncoding}</encoding>
+            <showDeprecation>false</showDeprecation>
+            <showWarnings>true</showWarnings>
+            <fork>true</fork>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.felix</groupId>
+        <artifactId>maven-bundle-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-eclipse-plugin</artifactId>
+      </plugin>
+      <!-- <plugin> -->
+      <!-- <groupId>org.codehaus.mojo</groupId> -->
+      <!-- <artifactId>license-maven-plugin</artifactId> -->
+      <!-- </plugin> -->
+      <plugin>
+        <groupId>net.alchim31.maven</groupId>
+        <artifactId>scala-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>
