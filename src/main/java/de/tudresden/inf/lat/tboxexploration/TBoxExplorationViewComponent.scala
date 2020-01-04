@@ -6,8 +6,8 @@ import java.awt.Color
 import java.awt.Dimension
 import java.awt.Graphics2D
 import java.awt.GridLayout
+import java.awt.Label
 import java.util.Collections
-import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
@@ -47,15 +47,25 @@ import javax.swing.JLabel
 import javax.swing.JOptionPane
 import javax.swing.JPanel
 import javax.swing.JScrollPane
-import java.awt.Label
+import org.protege.editor.core.ui.util.InputVerificationStatusChangedListener
+import org.semanticweb.owlapi.model.OWLObjectPropertyDomainAxiom
+import org.semanticweb.owlapi.model.OWLObjectPropertyRangeAxiom
+import org.semanticweb.owlapi.model.OWLDisjointClassesAxiom
+import org.semanticweb.owlapi.model.OWLEquivalentClassesAxiom
 
 class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
 
   protected def disposeOWLView() {
+    counterexampleAxiomList.dispose()
+    counterexampleAxiomListFrame.dispose()
+    confirmedAxiomList.dispose()
+    confirmedAxiomListFrame.dispose()
     pendingAxiomList.dispose()
     pendingAxiomListFrame.dispose()
     questions.clear()
     answers.clear()
+    counterexamples.clear()
+    repairedTBox.clear()
   }
   protected def initialiseOWLView() {
     println("Initializing TBox Exploration View Component...")
@@ -122,20 +132,20 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
             }) {
               def paintButtonContent(g: Graphics2D) {}
             })
-            buttons.add(new MListButton("Ignore", Color.GRAY.darker(), _ ⇒ {
-              answers.put(axiom, new IgnoreAnswer())
-              questions.remove(axiom)
-              pendingAxiomList.setRootObject(questions)
-            }) {
-              def paintButtonContent(g: Graphics2D) {}
-            })
-            buttons.add(new MListButton("Unsatisfiable Premise", Color.YELLOW.darker(), _ ⇒ {
-              answers.put(axiom, new UnsatisfiablePremiseAnswer())
-              questions.remove(axiom)
-              pendingAxiomList.setRootObject(questions)
-            }) {
-              def paintButtonContent(g: Graphics2D) {}
-            })
+            //            buttons.add(new MListButton("Ignore", Color.GRAY.darker(), _ ⇒ {
+            //              answers.put(axiom, new IgnoreAnswer())
+            //              questions.remove(axiom)
+            //              pendingAxiomList.setRootObject(questions)
+            //            }) {
+            //              def paintButtonContent(g: Graphics2D) {}
+            //            })
+            //            buttons.add(new MListButton("Unsatisfiable Premise", Color.YELLOW.darker(), _ ⇒ {
+            //              answers.put(axiom, new UnsatisfiablePremiseAnswer())
+            //              questions.remove(axiom)
+            //              pendingAxiomList.setRootObject(questions)
+            //            }) {
+            //              def paintButtonContent(g: Graphics2D) {}
+            //            })
             buttons.add(new MListButton("Decline", Color.RED.darker(), _ ⇒ {
               val counterexampleEditor = new OWLClassExpressionExpressionEditor()
               counterexampleEditor.setup("", "", getOWLEditorKit())
@@ -162,7 +172,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
               panel.add(violatedAxiomList)
               val okButton = new JButton("OK")
               val cancelButton = new JButton("Cancel")
-              counterexampleEditor.addStatusChangedListener(state ⇒ {
+              val statusChangedListener: InputVerificationStatusChangedListener = state ⇒ {
                 if (counterexampleEditor.getClassExpressions() != null && !counterexampleEditor.getClassExpressions().isEmpty()) {
                   val classExpression = counterexampleEditor.getClassExpressions().iterator().next()
                   if (classExpression != null) {
@@ -193,7 +203,8 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
                   indicator1.setText("This is not a well-formed class expression.")
                   indicator2.setText("")
                 }
-              })
+              }
+              counterexampleEditor.addStatusChangedListener(statusChangedListener)
               val pane = new JOptionPane(panel, JOptionPane.PLAIN_MESSAGE, JOptionPane.OK_CANCEL_OPTION, null, Array[Object](okButton, cancelButton), null)
               okButton.addActionListener(_ ⇒ pane.setValue(JOptionPane.OK_OPTION))
               cancelButton.addActionListener(_ ⇒ pane.setValue(JOptionPane.CANCEL_OPTION))
@@ -207,6 +218,10 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
                 questions.remove(axiom)
                 pendingAxiomList.setRootObject(questions)
               }
+              counterexampleEditor.removeStatusChangedListener(statusChangedListener)
+              counterexampleEditor.dispose()
+              violatedAxiomList.dispose()
+              violatedAxiomListFrame.dispose()
             }) {
               def paintButtonContent(g: Graphics2D) {}
             })
@@ -266,10 +281,75 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
     nextCounterexampleNumber.set(j + 1)
     val _refutableTBox = activeOntology.getTBoxAxioms(Imports.EXCLUDED)
     val refutableTBox = new ELTBox()
+    val rangeRestrictions = new ConcurrentHashMap[IRI, ELConceptDescription]()
     _refutableTBox.forEach(axiom ⇒ {
-      if (axiom.getAxiomType().equals(AxiomType.SUBCLASS_OF)) {
-        val subClassOfAxiom: OWLSubClassOfAxiom = axiom.asInstanceOf[OWLSubClassOfAxiom]
-        refutableTBox.getConceptInclusions().add(new ELConceptInclusion(new ELConceptDescription(subClassOfAxiom.getSubClass()).reduce(), new ELConceptDescription(subClassOfAxiom.getSuperClass()).reduce()))
+      axiom.getAxiomType() match {
+        case AxiomType.SUBCLASS_OF ⇒ {
+          val subClassOfAxiom = axiom.asInstanceOf[OWLSubClassOfAxiom]
+          refutableTBox.getConceptInclusions().add(new ELConceptInclusion(new ELConceptDescription(subClassOfAxiom.getSubClass()).reduce(), new ELConceptDescription(subClassOfAxiom.getSuperClass()).reduce()))
+        }
+        case AxiomType.DISJOINT_CLASSES ⇒ {
+          val disjointClassesAxiom = axiom.asInstanceOf[OWLDisjointClassesAxiom]
+          val disjointClasses = disjointClassesAxiom.getClassExpressionsAsList()
+          (0 until disjointClasses.size()).foreach(i ⇒ {
+            (i + 1 until disjointClasses.size()).foreach(j ⇒ {
+              refutableTBox.getConceptInclusions().add(
+                new ELConceptInclusion(
+                  ELConceptDescription.conjunction(
+                    new ELConceptDescription(disjointClasses.get(i)),
+                    new ELConceptDescription(disjointClasses.get(j))),
+                  ELConceptDescription.bot()))
+            })
+          })
+        }
+        case AxiomType.EQUIVALENT_CLASSES ⇒ {
+          val equivalentClassesAxiom = axiom.asInstanceOf[OWLEquivalentClassesAxiom]
+          val equivalentClasses = equivalentClassesAxiom.getClassExpressionsAsList()
+          (1 until equivalentClasses.size()).foreach(i ⇒ {
+            refutableTBox.getConceptInclusions.add(
+              new ELConceptInclusion(
+                new ELConceptDescription(equivalentClasses.get(i - 1)),
+                new ELConceptDescription(equivalentClasses.get(i))))
+          })
+          refutableTBox.getConceptInclusions.add(
+            new ELConceptInclusion(
+              new ELConceptDescription(equivalentClasses.get(equivalentClasses.size() - 1)),
+              new ELConceptDescription(equivalentClasses.get(0))))
+        }
+        case AxiomType.OBJECT_PROPERTY_DOMAIN ⇒ {
+          val domainRestrictionAxiom = axiom.asInstanceOf[OWLObjectPropertyDomainAxiom]
+          val property = domainRestrictionAxiom.getProperty()
+          if (property.isObjectPropertyExpression()) {
+            val r = property.asOWLObjectProperty().getIRI()
+            val dom = domainRestrictionAxiom.getDomain()
+            refutableTBox.getConceptInclusions().add(
+              new ELConceptInclusion(
+                ELConceptDescription.existentialRestriction(r, ELConceptDescription.top()),
+                new ELConceptDescription(dom)))
+          }
+        }
+        case AxiomType.OBJECT_PROPERTY_RANGE ⇒ {
+          println("not yet implemented to handle " + axiom)
+          val rangeRestrictionAxiom = axiom.asInstanceOf[OWLObjectPropertyRangeAxiom]
+          val property = rangeRestrictionAxiom.getProperty()
+          if (property.isObjectPropertyExpression()) {
+            val r = property.asOWLObjectProperty().getIRI()
+            val ran = rangeRestrictionAxiom.getRange()
+            rangeRestrictions.put(
+              r,
+              ELConceptDescription.conjunction(
+                new ELConceptDescription(ran),
+                rangeRestrictions.getOrDefault(r, ELConceptDescription.top())))
+          }
+        }
+        case AxiomType.EQUIVALENT_OBJECT_PROPERTIES ⇒ { println("not yet implemented to handle " + axiom) }
+        case AxiomType.SUB_OBJECT_PROPERTY          ⇒ { println("not yet implemented to handle " + axiom) }
+        case AxiomType.SUB_PROPERTY_CHAIN_OF        ⇒ { println("not yet implemented to handle " + axiom) }
+        case AxiomType.REFLEXIVE_OBJECT_PROPERTY    ⇒ { println("not yet implemented to handle " + axiom) }
+        case AxiomType.TRANSITIVE_OBJECT_PROPERTY   ⇒ { println("not yet implemented to handle " + axiom) }
+        case default ⇒ {
+          println("cannot handle " + axiom)
+        }
       }
     })
     println("refutable TBox: " + refutableTBox)
@@ -299,32 +379,32 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
         })
       }
 
-      val clop = DualClosureOperator.infimum((concept: ELConceptDescription) ⇒ {
+      val clop1a: DualClosureOperator[ELConceptDescription] = (concept: ELConceptDescription) ⇒ {
         if (rd < 0 || concept.roleDepth() > rd)
           throw new IllegalArgumentException()
         else if (concept.isBot())
           concept.clone().reduce()
         else {
-          val _tbox: Set[Pair[ELsiConceptDescription[Integer], ELsiConceptDescription[Integer]]] =
+          val _tbox: Set[(ELsiConceptDescription[Integer], ELsiConceptDescription[Integer])] =
             Set.empty ++ refutableTBox.getConceptInclusions().asScala.map(ci ⇒
               (ELsiConceptDescription.of(ci.getSubsumee()), ELsiConceptDescription.of(ci.getSubsumer())))
           ELsiConceptDescription.of(concept).clone().mostSpecificConsequence(_tbox).approximate(rd)
         }
-      }, new DualClosureOperator[ELConceptDescription]() {
-        def closure(concept: ELConceptDescription): ELConceptDescription = {
-          if (concept.isBot())
-            concept.clone().reduce()
-          else
-            counterexampleInterpretation.getMostSpecificConceptDescription(Sets.intersection(counterexampleInterpretation.getExtension(concept), counterexamples.keySet()), rd)
-        }
-      })
+      }
+      val clop1b: DualClosureOperator[ELConceptDescription] = (concept: ELConceptDescription) ⇒ {
+        if (concept.isBot())
+          concept.clone().reduce()
+        else
+          counterexampleInterpretation.getMostSpecificConceptDescription(Sets.intersection(counterexampleInterpretation.getExtension(concept), counterexamples.keySet()), rd)
+      }
+      val clop1 = DualClosureOperator.infimum(clop1a, clop1b)
       val clop2: DualClosureOperator[ELConceptDescription] = concept ⇒ {
         if (rd < 0 || concept.roleDepth() > rd)
           throw new IllegalArgumentException()
         else if (concept.isBot())
           concept.clone().reduce()
         else {
-          val _tbox: Set[Pair[ELsiConceptDescription[Integer], ELsiConceptDescription[Integer]]] =
+          val _tbox: Set[(ELsiConceptDescription[Integer], ELsiConceptDescription[Integer])] =
             Set.empty ++ repairedTBox.asScala.map(ci ⇒
               (ELsiConceptDescription.of(ci.getSubsumee()), ELsiConceptDescription.of(ci.getSubsumer())))
           ELsiConceptDescription.of(concept).clone().mostSpecificConsequence(_tbox).approximate(rd)
@@ -354,19 +434,22 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
         println("current candidates: " + currentCandidates)
         candidates.removeAll(currentCandidates)
         currentCandidates.parallelStream().forEach(candidate ⇒ if (candidate.roleDepth() <= rd) {
-          println("candidate: " + candidate + " from thread " + Thread.currentThread().toString())
+          var message = "candidate: " + candidate + " from thread " + Thread.currentThread().toString()
           val closure2 = clop2(candidate).reduce()
-          println("  with closure2: " + closure2)
+          message += "\r\n  with closure2: " + closure2
           if (!closure2.isBot()) {
             if (candidate.isEquivalentTo(closure2)) {
-              var closure1 = clop(candidate).reduce()
-              println("  with closure1: " + closure1)
+              var closure1 = clop1(candidate).reduce()
+              message += "\r\n  with closure1: " + closure1
+              message += "\r\n  with closure1a: " + clop1a(candidate).reduce()
+              message += "\r\n  with closure1b: " + clop1b(candidate).reduce()
+              println(message)
               var ask = !candidate.isEquivalentTo(closure1)
               var ignore = false
               var unsatisfiablePremise = false
               while (ask) {
                 ask = false
-                val future = askExpert(new ELConceptInclusion(candidate, closure1))
+                val future = askExpert(new ELConceptInclusion(candidate, closure1 without candidate))
                 val answer = future.get()
                 answer match {
                   case AcceptAnswer()               ⇒ {}
@@ -377,7 +460,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
                     insertCounterexample(c)
                     counterexamples.put(c, getOWLDataFactory().getOWLNamedIndividual(IRI.create(activeOntologyIRI + "#counterexample-" + nextCounterexampleNumber.getAndIncrement())))
                     updateProvidedCounterexamples()
-                    closure1 = clop(candidate).reduce()
+                    closure1 = clop1(candidate).reduce()
                     ask = !candidate.isEquivalentTo(closure1)
                   }
                 }
@@ -387,9 +470,9 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
                   repairedTBox.add(new ELConceptInclusion(candidate, ELConceptDescription.bot()))
                   updateConfirmedAxioms()
                 } else {
-                  closure1 = clop(candidate).reduce()
+                  closure1 = clop1(candidate).reduce()
                   if (!candidate.isEquivalentTo(closure1)) {
-                    repairedTBox.add(new ELConceptInclusion(candidate, closure1))
+                    repairedTBox.add(new ELConceptInclusion(candidate, closure1 without candidate))
                     updateConfirmedAxioms()
                   }
                   closure1.lowerNeighborsB(signature).forEach(lowerNeighbor ⇒
@@ -398,7 +481,10 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
               }
             } else {
               candidates.add(closure2)
+              println(message)
             }
+          } else {
+            println(message)
           }
           //        })))
         })
@@ -457,37 +543,45 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
     val providedCounterexamples = Sets.newHashSet[OWLAxiom]
     counterexamples.entrySet().forEach(counterexample ⇒
       providedCounterexamples.add(getOWLDataFactory().getOWLClassAssertionAxiom(counterexample.getKey().toOWLClassExpression(), counterexample.getValue())))
-    counterexampleAxiomList.setRootObject(providedCounterexamples)
-    counterexampleAxiomList.refreshComponent()
-    counterexampleAxiomList.repaint()
-    counterexampleAxiomList.validate()
+    Util.runOnProtegeThread(() ⇒ {
+      counterexampleAxiomList.setRootObject(providedCounterexamples)
+      counterexampleAxiomList.refreshComponent()
+      counterexampleAxiomList.repaint()
+      counterexampleAxiomList.validate()
+    }, true)
   }
 
   private def updateConfirmedAxioms() {
     val confirmedAxioms = Sets.newHashSet[OWLAxiom]
     repairedTBox.forEach(conceptInclusion ⇒
       confirmedAxioms.add(conceptInclusion.toOWLSubClassOfAxiom()))
-    confirmedAxiomList.setRootObject(confirmedAxioms)
-    confirmedAxiomList.refreshComponent()
-    confirmedAxiomList.repaint()
-    confirmedAxiomList.validate()
+    Util.runOnProtegeThread(() ⇒ {
+      confirmedAxiomList.setRootObject(confirmedAxioms)
+      confirmedAxiomList.refreshComponent()
+      confirmedAxiomList.repaint()
+      confirmedAxiomList.validate()
+    }, true)
   }
 
   private def clearPendingAxioms() {
-    pendingAxiomList.setRootObject(Collections.emptySet())
-    pendingAxiomList.refreshComponent()
-    pendingAxiomList.repaint()
-    pendingAxiomList.validate()
+    Util.runOnProtegeThread(() ⇒ {
+      pendingAxiomList.setRootObject(Collections.emptySet())
+      pendingAxiomList.refreshComponent()
+      pendingAxiomList.repaint()
+      pendingAxiomList.validate()
+    }, true)
   }
 
   private def askExpert(_question: ELConceptInclusion): Future[Answer] = {
     val question = _question.toOWLSubClassOfAxiom()
-    println("new question: " + question)
+    println("*** new question: " + question)
     questions.add(question)
-    pendingAxiomList.setRootObject(questions)
-    pendingAxiomList.refreshComponent()
-    pendingAxiomList.repaint()
-    pendingAxiomList.validate()
+    Util.runOnProtegeThread(() ⇒ {
+      pendingAxiomList.setRootObject(questions)
+      pendingAxiomList.refreshComponent()
+      pendingAxiomList.repaint()
+      pendingAxiomList.validate()
+    }, true)
     new Future[Answer]() {
 
       override def cancel(mayInterruptIfRunning: Boolean): Boolean = throw new RuntimeException("Not supported")
@@ -524,5 +618,11 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
   private case class IgnoreAnswer() extends Answer {}
   private case class UnsatisfiablePremiseAnswer() extends Answer {}
   private case class DeclineAnswer(val counterexample: OWLClassExpression) extends Answer {}
+
+  private def reduceTBox(conceptDescription: ELConceptDescription, conceptInclusions: Set[ELConceptInclusion]): ELConceptDescription = {
+    val reduction = conceptDescription.clone().reduce()
+
+    reduction
+  }
 
 }
