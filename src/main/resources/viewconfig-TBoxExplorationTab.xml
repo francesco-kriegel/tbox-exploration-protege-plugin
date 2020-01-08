@@ -8,7 +8,7 @@
                 </Component>
             </CNode>
             <CNode>
-                <Component label="TBox Exploration View Component">
+                <Component label="TBox Exploration">
                     <Property id="pluginId" value="tbox-exploration-protege-plugin.TBoxExplorationViewComponent"/>
                 </Component>
             </CNode>
