@@ -176,12 +176,23 @@ abstract class TBoxExploration2(
     candidates.add(ELConceptDescription.top())
     var iteration = 0
 
+    val cache = new CachedFunction[(ELConceptDescription, ELConceptDescription), Boolean]({
+      case (c, d) ⇒ c isSemanticallySmallerThan d
+    })
+
+    implicit class LocalImplicitELConceptDescription(c: ELConceptDescription) {
+      def cachedIsSemanticallySmallerThan(d: ELConceptDescription): Boolean = { cache((c, d)) }
+    }
+
     def isReadyForProcessing(candidate: ELConceptDescription): Boolean = {
-      candidates.parallelStream noneMatch {
-        otherCandidate ⇒
-          !(otherCandidate isEquivalentTo candidate) &&
-            (otherCandidate canBeSimulatedIn candidate)
-      }
+      //      candidates.parallelStream noneMatch {
+      //        otherCandidate ⇒
+      //          !(otherCandidate isEquivalentTo candidate) &&
+      //            (otherCandidate canBeSimulatedIn candidate)
+      //      }
+      //      candidates.parallelStream noneMatch { _ isSemanticallySmallerThan candidate }
+      //      candidates.parallelStream noneMatch { otherCandidate ⇒ cache((otherCandidate, candidate)) }
+      candidates.parallelStream noneMatch { _ cachedIsSemanticallySmallerThan candidate }
     }
 
     def processCandidate(candidate: ELConceptDescription) {
@@ -287,14 +298,15 @@ abstract class TBoxExploration2(
       println("repaired TBox: " + repairedCIs)
       println("counterexamples: " + counterexamples)
       println("all candidates: " + candidates)
-      println("removing superfluous candidates...")
       var oldSize = candidates.size
+      println("removing superfluous candidates...")
       candidates.retainAll(Collections3.representatives(candidates, ELConceptDescription.equivalence))
       println((oldSize - candidates.size) + " superfluous candidates removed.")
       oldSize = candidates.size
       println("removing candidates with role depth exceeding " + roleDepth)
       candidates.removeIf(_.roleDepth > roleDepth)
       println((oldSize - candidates.size) + " superfluous candidates removed.")
+      println("now there are " + candidates.size + " candidates in total")
       println("determining candidates that are ready to be processed...")
       val currentCandidates = candidates.parallelStream filter { isReadyForProcessing(_) } collect { Collectors.toSet() }
       println("current candidates: " + currentCandidates)

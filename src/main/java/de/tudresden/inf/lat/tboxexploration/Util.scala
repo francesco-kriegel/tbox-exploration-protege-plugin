@@ -127,7 +127,15 @@ object Util {
       c
     }
     def canBeSimulatedIn(d: ELConceptDescription): Boolean = {
-      (c subsumes d) || (d.getExistentialRestrictions.values.parallelStream anyMatch { c canBeSimulatedIn _ })
+      (c.roleDepth <= d.roleDepth) &&
+        ((c subsumes d) ||
+          (d.getExistentialRestrictions.values.parallelStream anyMatch { c canBeSimulatedIn _ }))
+    }
+    def isSemanticallySmallerThan(d: ELConceptDescription): Boolean = {
+      (c.roleDepth <= d.roleDepth) &&
+        !(d subsumes c) &&
+        ((c subsumes d) ||
+          (d.getExistentialRestrictions.values.parallelStream anyMatch { c canBeSimulatedIn _ }))
     }
   }
 
