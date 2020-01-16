@@ -36,7 +36,7 @@ import javax.swing.SwingUtilities
 import sun.swing.SwingUtilities2
 import com.sun.java.swing.SwingUtilities3
 
-abstract class TBoxExploration(
+abstract class TBoxExploration2(
   val roleDepth:                                Integer,
   private val maxRank:                          Integer,
   private val exploreRoleIncompatibilityAxioms: Boolean,
@@ -60,7 +60,6 @@ abstract class TBoxExploration(
   private val ignoredCIs = Sets.newConcurrentHashSet[ELConceptInclusion]
   private val confirmedRoleIncompatibilityAxioms = Sets.newConcurrentHashSet[ELConceptInclusion]
   private val checkedBinaryRoleCompositions = Sets.newConcurrentHashSet[(IRI, IRI)]
-  private val cachedRank = new CachedFunction[ELConceptDescription, Long](_.boundedRank(maxRank.longValue()))
 
   def start() {
     repairedCIs.clear()
@@ -81,14 +80,9 @@ abstract class TBoxExploration(
           counterexampleInterpretation.synchronized {
             counterexampleInterpretation.getConceptNameExtensionMatrix().colHeads().add(owlClass.getIRI())
           }
-          //          signature.addConceptNames(owlClass.getIRI())
         }
       }
-      case owlObjectProperty: OWLObjectProperty ⇒ {
-        //        if (!owlObjectProperty.isBuiltIn()) {
-        //          signature.addRoleNames(owlObjectProperty.getIRI())
-        //        }
-      }
+      case owlObjectProperty: OWLObjectProperty ⇒ {}
       case owlNamedIndividual: OWLNamedIndividual ⇒ {
         namedIndividuals add owlNamedIndividual
         val name = owlNamedIndividual.getIRI().toString().replaceFirst(activeOntologyIRI + "#counterexample-", "")
@@ -100,7 +94,6 @@ abstract class TBoxExploration(
       case default ⇒ {}
     })
     nextCounterexampleNumber.set(j + 1)
-    //    println("signature: " + signature)
 
     val canonicalModelOfABox = getCanonicalModelOfABox(ontology, owlModelManager.getOWLDataFactory())
     for (namedIndividual ← namedIndividuals.asScala) {
@@ -159,10 +152,6 @@ abstract class TBoxExploration(
           clopFromTBox(repairedCIs, roleDepth),
           clopFromTBox(staticCIs, roleDepth)),
         signature)
-    //    val clopCounterexamples =
-    //      compose(
-    //        compatibilize(clopOnlyCounterexamples, rd),
-    //        clopConfirmedRoleIncompatibilityAxioms)
     val clop_refutableCIs_staticCIs_counterexamples =
       restrict(
         DualClosureOperator.infimum(
@@ -185,7 +174,15 @@ abstract class TBoxExploration(
 
     val candidates = Sets.newConcurrentHashSet[ELConceptDescription]
     candidates.add(ELConceptDescription.top())
-    var rank: Long = 0
+    var iteration = 0
+
+    def isReadyForProcessing(candidate: ELConceptDescription): Boolean = {
+      candidates.parallelStream noneMatch {
+        otherCandidate ⇒
+          !(otherCandidate isEquivalentTo candidate) &&
+            (otherCandidate canBeSimulatedIn candidate)
+      }
+    }
 
     def processCandidate(candidate: ELConceptDescription) {
       def checkIfRepairIsCancelled() {
@@ -281,23 +278,29 @@ abstract class TBoxExploration(
       }
     }
 
-    while (rank <= maxRank && !candidates.isEmpty()) {
+    while (!candidates.isEmpty()) {
       if (isCancelled())
         throw new InterruptedException("Repair process has been interrupted.")
-      println("rank: " + rank)
-      setStatus("rank: " + rank)
+      iteration += 1
+      println("iteration: " + iteration)
+      setStatus("iteration: " + iteration)
       println("repaired TBox: " + repairedCIs)
       println("counterexamples: " + counterexamples)
-      candidates.retainAll(Collections3.representatives(candidates, ELConceptDescription.equivalence()))
-      val currentCandidates = candidates.parallelStream().filter(cachedRank(_) == rank).collect(Collectors.toSet())
-      println("current candidates: " + currentCandidates)
-      candidates.removeAll(currentCandidates)
-      currentCandidates.parallelStream().forEach(
-        candidate ⇒ if (candidate.roleDepth() <= roleDepth) processCandidate(candidate))
-      //      rank += 1
-      println("determining next rank...")
       println("all candidates: " + candidates)
-      rank = candidates.parallelStream().map[Long](cachedRank).min(java.lang.Long.compare).orElse(rank + 1)
+      println("removing superfluous candidates...")
+      var oldSize = candidates.size
+      candidates.retainAll(Collections3.representatives(candidates, ELConceptDescription.equivalence))
+      println((oldSize - candidates.size) + " superfluous candidates removed.")
+      oldSize = candidates.size
+      println("removing candidates with role depth exceeding " + roleDepth)
+      candidates.removeIf(_.roleDepth > roleDepth)
+      println((oldSize - candidates.size) + " superfluous candidates removed.")
+      println("determining candidates that are ready to be processed...")
+      val currentCandidates = candidates.parallelStream filter { isReadyForProcessing(_) } collect { Collectors.toSet() }
+      println("current candidates: " + currentCandidates)
+      println(currentCandidates.size + " candidates found for processing.")
+      candidates.removeAll(currentCandidates)
+      currentCandidates.parallelStream forEach { processCandidate(_) }
     }
     println("Repair finished.")
     setStatus("Repair finished.")
