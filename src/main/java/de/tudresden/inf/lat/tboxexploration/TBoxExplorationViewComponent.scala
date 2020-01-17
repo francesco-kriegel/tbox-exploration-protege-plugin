@@ -89,6 +89,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
           val counter = pendingAxiomMetadata.get(question)
           question match {
             case subClassOfAxiom: OWLSubClassOfAxiom ⇒ {
+              // TODO: remove these consistency checks from GUI thread
               if (!exploration.repairedOntologyBecomesInconsistent(subClassOfAxiom))
                 buttons.add(
                   new TextMListButton(
