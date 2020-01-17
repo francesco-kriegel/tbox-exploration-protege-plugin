@@ -24,9 +24,6 @@ private class OrderedOWLAxiomListFrame(owlEditorKit: OWLEditorKit)
   addSection(new AxiomListFrameSection(owlEditorKit, this) {
     private var rowComparator: Comparator[OWLFrameSectionRow[java.util.Set[OWLAxiom], OWLAxiom, OWLAxiom]] = _
     override def getRowComparator(): Comparator[OWLFrameSectionRow[java.util.Set[OWLAxiom], OWLAxiom, OWLAxiom]] = { this.rowComparator }
-    //        def setRowComparator(c: Comparator[OWLFrameSectionRow[java.util.Set[OWLAxiom], OWLAxiom, OWLAxiom]]) {
-    //          this.rowComparator = c
-    //        }
   });
 }
 
@@ -37,14 +34,14 @@ class OWLAxiomList(title: String, owlEditorKit: OWLEditorKit)
   setPrivateFields()
 
   private def setPrivateFields() {
-    val frameField = findDeclaredField(this.getClass(), "frame")
+    val frameField = findDeclaredField(this.getClass, "frame")
     frameField.setAccessible(true)
     val frame = frameField.get(this).asInstanceOf[OrderedOWLAxiomListFrame]
-    val frameSection = frame.getFrameSections().get(0)
-    val labelField = findDeclaredField(frameSection.getClass(), "label")
+    val frameSection = frame.getFrameSections.get(0)
+    val labelField = findDeclaredField(frameSection.getClass, "label")
     labelField.setAccessible(true)
     labelField.set(frameSection, title)
-    val rowComparatorField = findDeclaredField(frameSection.getClass(), "rowComparator")
+    val rowComparatorField = findDeclaredField(frameSection.getClass, "rowComparator")
     rowComparatorField.setAccessible(true)
     rowComparatorField.set(frameSection, new Comparator[OWLFrameSectionRow[Set[OWLAxiom], OWLAxiom, OWLAxiom]] {
       override def compare(
@@ -55,58 +52,47 @@ class OWLAxiomList(title: String, owlEditorKit: OWLEditorKit)
     })
   }
 
-  override protected def getButtons(value: Object): java.util.List[MListButton] = Collections.emptyList()
+  override protected def getButtons(value: Object): java.util.List[MListButton] = Collections.emptyList[MListButton]
 
-  private val axioms = new HashSetArrayList[OWLAxiom] // Sets.newConcurrentHashSet[OWLAxiom]
+  private val axioms = Lists.newCopyOnWriteArrayList[OWLAxiom] // Sets.newConcurrentHashSet[OWLAxiom]
 
-  setRootObject(axioms)
+  setRootObject(Collections.emptySet[OWLAxiom])
 
   def refresh() {
-    setRootObject(axioms)
+    setRootObject(new java.util.HashSet[OWLAxiom](axioms))
     refreshComponent()
     validate()
     repaint()
   }
 
   def add(axiom: OWLAxiom) {
-    axioms.synchronized {
-      axioms add axiom
-    }
+    if (!axioms.contains(axiom))
+      axioms.add(axiom)
     refresh()
   }
 
   def remove(axiom: OWLAxiom) {
-    axioms.synchronized {
-      axioms remove axiom
-    }
+    axioms.remove(axiom)
     refresh()
   }
 
   def clear() {
-    axioms.synchronized {
-      axioms.clear()
-    }
+    axioms.clear()
     refresh()
   }
 
-  def set(content: java.util.Set[OWLAxiom]) {
-    axioms.synchronized {
-      axioms.clear()
-      axioms addAll content
-    }
+  def set(content: java.util.Collection[OWLAxiom]) {
+    axioms.clear()
+    axioms.addAll(content)
     refresh()
   }
 
   def forEach(consumer: OWLAxiom ⇒ Unit) {
-    axioms.synchronized {
-      axioms.forEach(consumer(_))
-    }
+    axioms.forEach(consumer(_))
   }
 
   override def dispose() {
-    axioms.synchronized {
-      axioms.clear()
-    }
+    axioms.clear()
     super.dispose()
   }
 
