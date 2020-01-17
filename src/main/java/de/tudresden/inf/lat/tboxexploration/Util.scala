@@ -140,8 +140,8 @@ object Util {
   }
 
   implicit class ImplicitOWLClassExpression(c: OWLClassExpression) {
-    def and(d: ELConceptDescription) = ELConceptDescription.conjunction(c, d)
-    def SubClassOf(d: ELConceptDescription) = new ELConceptInclusion(c, d)
+    def and(d: OWLClassExpression) = ELConceptDescription.conjunction(c, d)
+    def SubClassOf(d: OWLClassExpression) = new ELConceptInclusion(c, d)
     def satisfies(ci: ELConceptInclusion) = (c isSubsumedBy ci.getSubsumee()) -> (c isSubsumedBy ci.getSubsumer())
   }
 

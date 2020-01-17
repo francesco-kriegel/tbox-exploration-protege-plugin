@@ -10,6 +10,8 @@ import java.awt.GridLayout
 import java.awt.Insets
 import java.awt.Label
 import java.awt.event.ActionListener
+import java.awt.event.ComponentEvent
+import java.awt.event.ComponentListener
 import java.text.ParseException
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
@@ -46,6 +48,8 @@ import javax.swing.JSpinner
 import javax.swing.ScrollPaneConstants
 import javax.swing.SpinnerNumberModel
 import javax.swing.UIManager
+import javax.swing.SwingWorker
+import javax.xml.transform.Result
 
 class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
 
@@ -71,31 +75,6 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
 
   protected def initialiseOWLView() {
     println("Initializing TBox Exploration View Component...")
-    //    val counterexampleFrameList = new OWLFrameList[java.util.Set[OWLClassExpression]](getOWLEditorKit(), new AbstractOWLFrame[java.util.Set[OWLClassExpression]](getOWLModelManager().getOWLOntologyManager()) {
-    //      addSection(new AbstractOWLFrameSection[java.util.Set[OWLClassExpression], OWLAxiom, OWLClassExpression](getOWLEditorKit(), "Provided Counterexamples", this) {
-    //        override protected def createAxiom(classExpression: OWLClassExpression): OWLAxiom = { null }
-    //        override def getObjectEditor(): OWLObjectEditor[OWLClassExpression] = { null }
-    //        override protected def refill(ontology: OWLOntology): Unit = {
-    //          getRootObject().forEach(classExpression ⇒ {
-    //            addRow(new AbstractOWLFrameSectionRow[java.util.Set[OWLClassExpression], OWLAxiom, OWLClassExpression]() {
-    //
-    //            })
-    //          })
-    //        }
-    //        override protected def clear(): Unit = {}
-    //        override def canAdd(): Boolean = { false }
-    //
-    //        private class RowComparator extends Comparator[OWLFrameSectionRow[java.util.Set[OWLClassExpression], OWLAxiom, OWLClassExpression]] {
-    //          private val objComparator: Comparator[OWLObject] = getOWLModelManager().getOWLObjectComparator()
-    //          override def compare(o1: OWLFrameSectionRow[java.util.Set[OWLClassExpression], OWLAxiom, OWLClassExpression], o2: OWLFrameSectionRow[java.util.Set[OWLClassExpression], OWLAxiom, OWLClassExpression]) {
-    //            objComparator.compare(o1.getAxiom(), o2.getAxiom())
-    //          }
-    //        }
-    //        private val rowComparator: RowComparator = new RowComparator()
-    //        override def getRowComparator(): Comparator[OWLFrameSectionRow[java.util.Set[OWLClassExpression], OWLAxiom, OWLClassExpression]] = { rowComparator }
-    //      })
-    //    })
-
     staticAxiomList = new OWLAxiomList("Static Axioms", getOWLEditorKit())
     refutableAxiomList = new OWLAxiomList("Refutable Axioms", getOWLEditorKit())
     counterexampleAxiomList = new OWLAxiomList("Provided Counterexamples", getOWLEditorKit())
@@ -314,20 +293,12 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
     //    val inputConclusionRank =
     //      allCIs.parallelStream().map[Long](_.getSubsumer.rank5).max(java.lang.Long.compare).orElse(0)
 
-    //    val worker = new SwingWorker[Integer, String]() {
-    //      override def doInBackground(): Integer = {
-    //        0
-    //      }
-    //    }
-    //    worker.execute()
-    //    worker.get()
-
     def specifyArguments(): (Object, Integer, Integer, Boolean, OWLAxiom) = {
       println("asking for arguments...")
-      val roleDepthSpinner = new JSpinner(new SpinnerNumberModel(2, 0, 32, 1))
-      val roleDepthSpinnerStatusLabel = new JLabel(" ")
-      val maxRankCheckBox = new JCheckBox("maximal rank (deprecated)", true)
-      val maxRankSpinner = new JSpinner(new SpinnerNumberModel(16, 0, Integer.MAX_VALUE, 1))
+      val roleDepthSpinner = new JSpinner(new SpinnerNumberModel(5, 0, 32, 1))
+      //      val roleDepthSpinnerStatusLabel = new JLabel(" ")
+      //      val maxRankCheckBox = new JCheckBox("maximal rank (deprecated)", true)
+      //      val maxRankSpinner = new JSpinner(new SpinnerNumberModel(16, 0, Integer.MAX_VALUE, 1))
       val exploreRoleIncompatibilityAxiomsCheckBox = new JCheckBox(
         "<html>The ontology is not complete for role incompatibility axioms.  If selected, then you will be asked whether<br>" +
           "some binary role compositions are unsatisfiable.  Note that this is an experimental feature.", true)
@@ -370,43 +341,43 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
           new Insets(0, 0, 0, 0), // insets
           4, 4 // ipadx, ipady
         ))
-      panel.add(
-        roleDepthSpinnerStatusLabel,
-        new GridBagConstraints(
-          1, 2, // gridx, gridy
-          1, 1, // gridwidth, gridheight
-          0, 0, // weightx, weighty
-          GridBagConstraints.LINE_START, // anchor
-          GridBagConstraints.HORIZONTAL, // fill
-          new Insets(0, 0, 0, 0), // insets
-          4, 4 // ipadx, ipady
-        ))
-      panel.add(
-        maxRankCheckBox,
-        new GridBagConstraints(
-          0, 3, // gridx, gridy
-          1, 1, // gridwidth, gridheight
-          0, 0, // weightx, weighty
-          GridBagConstraints.LINE_END, // anchor
-          GridBagConstraints.HORIZONTAL, // fill
-          new Insets(0, 0, 0, 0), // insets
-          4, 4 // ipadx, ipady
-        ))
-      panel.add(
-        maxRankSpinner,
-        new GridBagConstraints(
-          1, 3, // gridx, gridy
-          1, 1, // gridwidth, gridheight
-          0, 0, // weightx, weighty
-          GridBagConstraints.LINE_START, // anchor
-          GridBagConstraints.HORIZONTAL, // fill
-          new Insets(0, 0, 0, 0), // insets
-          4, 4 // ipadx, ipady
-        ))
+      //      panel.add(
+      //        roleDepthSpinnerStatusLabel,
+      //        new GridBagConstraints(
+      //          1, 2, // gridx, gridy
+      //          1, 1, // gridwidth, gridheight
+      //          0, 0, // weightx, weighty
+      //          GridBagConstraints.LINE_START, // anchor
+      //          GridBagConstraints.HORIZONTAL, // fill
+      //          new Insets(0, 0, 0, 0), // insets
+      //          4, 4 // ipadx, ipady
+      //        ))
+      //      panel.add(
+      //        maxRankCheckBox,
+      //        new GridBagConstraints(
+      //          0, 3, // gridx, gridy
+      //          1, 1, // gridwidth, gridheight
+      //          0, 0, // weightx, weighty
+      //          GridBagConstraints.LINE_END, // anchor
+      //          GridBagConstraints.HORIZONTAL, // fill
+      //          new Insets(0, 0, 0, 0), // insets
+      //          4, 4 // ipadx, ipady
+      //        ))
+      //      panel.add(
+      //        maxRankSpinner,
+      //        new GridBagConstraints(
+      //          1, 3, // gridx, gridy
+      //          1, 1, // gridwidth, gridheight
+      //          0, 0, // weightx, weighty
+      //          GridBagConstraints.LINE_START, // anchor
+      //          GridBagConstraints.HORIZONTAL, // fill
+      //          new Insets(0, 0, 0, 0), // insets
+      //          4, 4 // ipadx, ipady
+      //        ))
       panel.add(
         exploreRoleIncompatibilityAxiomsCheckBox,
         new GridBagConstraints(
-          0, 4, // gridx, gridy
+          0, 2, // gridx, gridy
           2, 1, // gridwidth, gridheight
           0, 0, // weightx, weighty
           GridBagConstraints.CENTER, // anchor
@@ -417,10 +388,10 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       panel.add(
         unwantedConsequenceCheckBox,
         new GridBagConstraints(
-          0, 5, // gridx, gridy
+          0, 3, // gridx, gridy
           1, 1, // gridwidth, gridheight
           0, 0, // weightx, weighty
-          GridBagConstraints.CENTER, // anchor
+          GridBagConstraints.FIRST_LINE_START, // anchor
           GridBagConstraints.HORIZONTAL, // fill
           new Insets(0, 0, 0, 0), // insets
           4, 4 // ipadx, ipady
@@ -431,7 +402,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
           ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
           ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED),
         new GridBagConstraints(
-          1, 5, // gridx, gridy
+          1, 3, // gridx, gridy
           1, 1, // gridwidth, gridheight
           1, 1, // weightx, weighty
           GridBagConstraints.CENTER, // anchor
@@ -442,7 +413,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       panel.add(
         unwantedConsequenceStatusLabel,
         new GridBagConstraints(
-          1, 6, // gridx, gridy
+          1, 4, // gridx, gridy
           1, 1, // gridwidth, gridheight
           0, 0, // weightx, weighty
           GridBagConstraints.LINE_START, // anchor
@@ -453,13 +424,14 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       val okButton = new JButton("OK")
       val cancelButton = new JButton("Cancel")
       var thread: Thread = new Thread(() ⇒ {})
-      roleDepthSpinner.addChangeListener(_ ⇒ {
-        if (roleDepthSpinner.getValue().asInstanceOf[Integer] > 2)
-          roleDepthSpinnerStatusLabel.setText("Running the algorithm with a role depth greater than 2 might be infeasible.")
-        else
-          roleDepthSpinnerStatusLabel.setText(" ")
-      })
+      //      roleDepthSpinner.addChangeListener(_ ⇒ {
+      //        if (roleDepthSpinner.getValue().asInstanceOf[Integer] > 2)
+      //          roleDepthSpinnerStatusLabel.setText("Running the algorithm with a role depth greater than 2 might be infeasible.")
+      //        else
+      //          roleDepthSpinnerStatusLabel.setText(" ")
+      //      })
       val statusChangedListener: InputVerificationStatusChangedListener = _ ⇒ {
+        System.err.println("The following java.lang.ThreadDeath error can be ignored, since it is caused by intentionally stopping a thread.")
         thread.stop()
         unwantedConsequenceStatusLabel.setText("Please wait...")
         if (unwantedConsequenceAxiomEditor.getEditedObject() != null) {
@@ -510,8 +482,8 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       }
       unwantedConsequenceAxiomEditor.addStatusChangedListener(statusChangedListener)
       unwantedConsequenceAxiomEditorComponent.setEnabled(false)
-      maxRankCheckBox.addActionListener(_ ⇒
-        maxRankSpinner.setEnabled(maxRankCheckBox.isSelected()))
+      //      maxRankCheckBox.addActionListener(_ ⇒
+      //        maxRankSpinner.setEnabled(maxRankCheckBox.isSelected()))
       unwantedConsequenceCheckBox.addActionListener(_ ⇒ {
         unwantedConsequenceAxiomEditorComponent.setEnabled(unwantedConsequenceCheckBox.isSelected())
         if (!unwantedConsequenceCheckBox.isSelected()) {
@@ -525,7 +497,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       okButton.addActionListener(_ ⇒ {
         try {
           roleDepthSpinner.commitEdit()
-          maxRankSpinner.commitEdit()
+          //          maxRankSpinner.commitEdit()
           pane.setValue(JOptionPane.OK_OPTION)
         } catch {
           case e: ParseException ⇒ {}
@@ -544,7 +516,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       (
         pane.getValue(),
         roleDepthSpinner.getValue().asInstanceOf[Integer],
-        if (maxRankCheckBox.isSelected()) maxRankSpinner.getValue().asInstanceOf[Integer] else Integer.MAX_VALUE,
+        Integer.MAX_VALUE, // if (maxRankCheckBox.isSelected()) maxRankSpinner.getValue().asInstanceOf[Integer] else Integer.MAX_VALUE,
         exploreRoleIncompatibilityAxiomsCheckBox.isSelected(),
         axiom)
 
@@ -701,49 +673,165 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
   }
 
   private def askForCounterexample(subClassOfAxiom: OWLSubClassOfAxiom) {
+    //    class WrapJLabel(textWithoutHTML: String) extends JLabel(textWithoutHTML) {
+    //      private def updateText() {
+    //        println("updating JLabel to width " + getWidth)
+    //        setText("<html><p style='width:" + getWidth + "px'>" + textWithoutHTML + "</p></html>")
+    //      }
+    //      updateText()
+    //      addComponentListener(new ComponentListener() {
+    //        override def componentResized(e: ComponentEvent) { updateText() }
+    //        override def componentMoved(e: ComponentEvent) {}
+    //        override def componentShown(e: ComponentEvent) {}
+    //        override def componentHidden(e: ComponentEvent) {}
+    //      })
+    //    }
+    val explanationLabel = new JLabel(
+      "<html><p style='width:580px'>Please specify a counterexample against " + subClassOfAxiom + "!" +
+        " The below editor already contains the most general possible counterexample." +
+        " You must modify it such that it describes an existing individual in the domain of interest." +
+        " Alternatively, you can use the below button to write the conjunction of the axiom's premise" +
+        " and conclusion into the editor and then modify it in a suitable way." +
+        " Note that the counterexample must be completely specified up to a depth of " + exploration.roleDepth + "." +
+        " Furthermore, implicit counterexamples might be induced.  For instance, if there is a filler" +
+        " of an existential restriction at level i and the filler has role depth j, then this filler" +
+        " is an implicit counterexample if the difference j minus i is smaller than " + exploration.roleDepth + "," +
+        " since it then must be completely specified up to depth " + exploration.roleDepth + " as well.</p></html>")
     val counterexampleEditor = new OWLClassExpressionExpressionEditor()
     counterexampleEditor.setup("", "", getOWLEditorKit())
     counterexampleEditor.initialise()
     counterexampleEditor.setDescription(subClassOfAxiom.getSubClass())
     val counterexampleEditorComponent =
       counterexampleEditor.getComponent().getComponent(0).asInstanceOf[JScrollPane].getComponent(0)
-    val panel = new JPanel()
-    panel.setLayout(new GridLayout(0, 1))
-    panel.add(new JLabel(
-      "<html>Please specify a counterexample against " + subClassOfAxiom + "!" +
-        "<br>Note that the counterexample must be completely specified up to a depth of " + exploration.roleDepth + "."))
-    panel.add(new JScrollPane(
-      counterexampleEditorComponent,
-      ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
-      ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED))
-    val indicator = new Label()
-    panel.add(indicator)
+    val setCounterexampleEditorToConclusionButton = new JButton("Write conjunction of premise and conclusion in the counterexample editor for modifying it")
+    setCounterexampleEditorToConclusionButton.addActionListener(_ ⇒ {
+      counterexampleEditor.setDescription(subClassOfAxiom.getSubClass() and subClassOfAxiom.getSuperClass())
+    })
+    val indicator = new JLabel()
     val violatedAxiomList = new OWLAxiomList("Violated Axioms", getOWLEditorKit())
-    panel.add(violatedAxiomList)
+    val saturateButton = new JButton("Saturate")
+    saturateButton.setEnabled(false)
+    saturateButton.addActionListener(_ ⇒ {
+      saturateButton.setEnabled(false)
+      saturateButton.setText("Computing saturation...")
+      val classExpression: ELConceptDescription = counterexampleEditor.getClassExpressions.iterator.next
+      new SwingWorker[ELConceptDescription, Nothing]() {
+        override def doInBackground(): ELConceptDescription = {
+          println("Computing saturation of " + classExpression + "...")
+          exploration.saturateCounterexample(classExpression)
+        }
+        override def done() {
+          println("Saturation: " + get)
+          counterexampleEditor.setDescription(get)
+          saturateButton.setText("Saturate")
+        }
+      }.execute()
+    })
+    val panel = new JPanel()
+    panel.setLayout(new GridBagLayout())
+    panel.add(
+      explanationLabel,
+      new GridBagConstraints(
+        0, 0, // gridx, gridy
+        2, 1, // gridwidth, gridheight
+        0, 0, // weightx, weighty
+        GridBagConstraints.LINE_START, // anchor
+        GridBagConstraints.HORIZONTAL, // fill
+        new Insets(0, 0, 0, 0), // insets
+        4, 4 // ipadx, ipady
+      ))
+    panel.add(
+      setCounterexampleEditorToConclusionButton,
+      new GridBagConstraints(
+        0, 1, // gridx, gridy
+        1, 1, // gridwidth, gridheight
+        0, 0, // weightx, weighty
+        GridBagConstraints.LINE_START, // anchor
+        GridBagConstraints.NONE, // fill
+        new Insets(0, 0, 0, 0), // insets
+        4, 4 // ipadx, ipady
+      ))
+    panel.add(
+      new JScrollPane(
+        counterexampleEditorComponent,
+        ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
+        ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED),
+      new GridBagConstraints(
+        0, 2, // gridx, gridy
+        2, 1, // gridwidth, gridheight
+        0, 0.5, // weightx, weighty
+        GridBagConstraints.CENTER, // anchor
+        GridBagConstraints.BOTH, // fill
+        new Insets(0, 0, 0, 0), // insets
+        4, 4 // ipadx, ipady
+      ))
+    panel.add(
+      indicator,
+      new GridBagConstraints(
+        0, 3, // gridx, gridy
+        2, 1, // gridwidth, gridheight
+        0, 0, // weightx, weighty
+        GridBagConstraints.LINE_START, // anchor
+        GridBagConstraints.HORIZONTAL, // fill
+        new Insets(0, 0, 0, 0), // insets
+        4, 4 // ipadx, ipady
+      ))
+    panel.add(
+      new JScrollPane(
+        violatedAxiomList,
+        ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
+        ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED),
+      new GridBagConstraints(
+        0, 4, // gridx, gridy
+        2, 1, // gridwidth, gridheight
+        0, 1, // weightx, weighty
+        GridBagConstraints.CENTER, // anchor
+        GridBagConstraints.BOTH, // fill
+        new Insets(0, 0, 0, 0), // insets
+        4, 4 // ipadx, ipady
+      ))
+    panel.add(
+      saturateButton,
+      new GridBagConstraints(
+        0, 5, // gridx, gridy
+        2, 1, // gridwidth, gridheight
+        0, 0, // weightx, weighty
+        GridBagConstraints.LINE_START, // anchor
+        GridBagConstraints.NONE, // fill
+        new Insets(0, 0, 0, 0), // insets
+        4, 4 // ipadx, ipady
+      ))
     val okButton = new JButton("OK")
     val cancelButton = new JButton("Cancel")
     val statusChangedListener: InputVerificationStatusChangedListener = state ⇒ {
-      if (counterexampleEditor.getClassExpressions() != null && !counterexampleEditor.getClassExpressions().isEmpty()) {
-        val classExpression = counterexampleEditor.getClassExpressions().iterator().next()
+      saturateButton.setEnabled(false)
+      if (counterexampleEditor.getClassExpressions != null && !counterexampleEditor.getClassExpressions.isEmpty) {
+        val classExpression = counterexampleEditor.getClassExpressions.iterator.next
         if (classExpression != null) {
           val isCounterexample = !(classExpression satisfies subClassOfAxiom)
-          val violatedConceptInclusions = exploration.getViolatedConceptInclusions(classExpression)
+          val violatedConceptInclusions = exploration.getViolatedConceptInclusionsAsOWLAxioms(classExpression)
           violatedAxiomList set violatedConceptInclusions
-          okButton.setEnabled(isCounterexample && violatedConceptInclusions.isEmpty())
+          okButton.setEnabled(isCounterexample && violatedConceptInclusions.isEmpty)
           indicator.setText(
-            "<html>This class expression is " +
+            "<html><p style='width:580px'>This class expression is " +
               (if (isCounterexample) "" else "not ") +
               "a valid counterexample against the above axiom" +
-              (if (violatedConceptInclusions.isEmpty()) "."
-              else (if (isCounterexample) ",<br>but " else "<br>and ") +
-                "it violates the following axioms, which you have already confirmed as valid.<br>Please adjust the class expression accordingly!"))
+              (if (violatedConceptInclusions.isEmpty) "."
+              else (if (isCounterexample) ", but " else " and ") +
+                "it violates the following axioms, which you have already confirmed as valid." +
+                " Please adjust the class expression accordingly!  Alternatively, you can" +
+                " saturate the entered class expression with respect to these violated axioms" +
+                " by clicking the below button.  Note that you must then check whether the resulting" +
+                " class expression really describes an individual in the domain of interest.</p></html>"))
+          if (!violatedConceptInclusions.isEmpty)
+            saturateButton.setEnabled(true)
         } else {
           okButton.setEnabled(false)
-          indicator.setText("This is not a well-formed class expression.")
+          indicator.setText("<html><p style='width:580px'>This is not a well-formed class expression.</p></html>")
         }
       } else {
         okButton.setEnabled(false)
-        indicator.setText("This is not a well-formed class expression.")
+        indicator.setText("<html><p style='width:580px'>This is not a well-formed class expression.</p></html>")
       }
     }
     counterexampleEditor.addStatusChangedListener(statusChangedListener)
@@ -753,7 +841,25 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
     cancelButton.addActionListener(_ ⇒ pane.setValue(JOptionPane.CANCEL_OPTION))
     val dialog = pane.createDialog("New Counterexample")
     dialog.setResizable(true)
-    dialog.setMinimumSize(new Dimension(400, 300))
+    val size = new Dimension(800, 500)
+    //    dialog.setPreferredSize(size)
+    dialog.setMinimumSize(size)
+    //    dialog.setMaximumSize(size)
+    dialog.setSize(size)
+    dialog.addComponentListener(new ComponentListener() {
+      //      private var lastX: Int = dialog.getLocation.x
+      override def componentResized(e: ComponentEvent) {
+        dialog.setSize(new Dimension(800, Math.max(400, dialog.getHeight())))
+        //        dialog.setLocation(lastX, dialog.getLocation.y)
+      }
+      override def componentMoved(e: ComponentEvent) {
+        //        lastX = dialog.getLocation.x
+      }
+      override def componentShown(e: ComponentEvent) {
+        //        lastX = dialog.getLocation.x
+      }
+      override def componentHidden(e: ComponentEvent) {}
+    })
     dialog.setVisible(true)
     if (pane.getValue().equals(JOptionPane.OK_OPTION)) {
       val counterexample: OWLClassExpression = counterexampleEditor.getClassExpressions().iterator().next()
@@ -762,10 +868,12 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
         pendingAxiomList.remove(subClassOfAxiom)
         pendingAxiomMetadata.remove(subClassOfAxiom)
       }
+      val counterexamples = Set[ELConceptDescription](counterexample) ++ exploration.getImplicitCompletelySpecifiedCounterexamples(counterexample)
       pendingAxiomList.forEach({
         case otherOWLSubClassOfAxiom: OWLSubClassOfAxiom ⇒ {
           if (!subClassOfAxiom.equals(otherOWLSubClassOfAxiom)) {
-            if (!(counterexample satisfies otherOWLSubClassOfAxiom)) {
+            //            if (!(counterexample satisfies otherOWLSubClassOfAxiom)) {
+            if (counterexamples exists { c ⇒ !(c satisfies otherOWLSubClassOfAxiom) }) {
               answers.put((otherOWLSubClassOfAxiom, pendingAxiomMetadata.get(otherOWLSubClassOfAxiom)), new InheritedDeclineAnswer())
               synchronouslyOnProtegeThread {
                 pendingAxiomList.remove(otherOWLSubClassOfAxiom)

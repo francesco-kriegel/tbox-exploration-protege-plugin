@@ -35,6 +35,7 @@ import conexp.fx.core.math.DualClosureOperator
 import javax.swing.SwingUtilities
 import sun.swing.SwingUtilities2
 import com.sun.java.swing.SwingUtilities3
+import java.util.Collections
 
 abstract class TBoxExploration2(
   val roleDepth:                                Integer,
@@ -56,6 +57,7 @@ abstract class TBoxExploration2(
   private val counterexamples = new ConcurrentHashMap[ELConceptDescription, OWLNamedIndividual]
   private var counterexampleInterpretation = new ELInterpretation2[ELConceptDescription]
   private val nextCounterexampleNumber = new AtomicInteger(0)
+  private var staticCIs = Collections.emptySet[ELConceptInclusion]
   private val repairedCIs = Sets.newConcurrentHashSet[ELConceptInclusion]
   private val ignoredCIs = Sets.newConcurrentHashSet[ELConceptInclusion]
   private val confirmedRoleIncompatibilityAxioms = Sets.newConcurrentHashSet[ELConceptInclusion]
@@ -123,7 +125,8 @@ abstract class TBoxExploration2(
     handleStaticAxioms(staticPart)
     handleRefutableAxioms(refutablePart)
     val (refutableCIs, refutableRRs) = transformTBox(refutablePart)
-    val (staticCIs, staticRRs) = transformTBox(staticPart)
+    val (_staticCIs, staticRRs) = transformTBox(staticPart)
+    staticCIs = _staticCIs
     println("unwanted consequence: " + unwantedConsequence)
     println("static part: " + staticCIs)
     println("refutable part: " + refutableCIs)
@@ -176,11 +179,10 @@ abstract class TBoxExploration2(
     candidates.add(ELConceptDescription.top())
     var iteration = 0
 
-    val cache = new CachedFunction[(ELConceptDescription, ELConceptDescription), Boolean]({
-      case (c, d) ⇒ c isSemanticallySmallerThan d
-    })
-
     implicit class LocalImplicitELConceptDescription(c: ELConceptDescription) {
+      private val cache = new CachedFunction[(ELConceptDescription, ELConceptDescription), Boolean]({
+        case (c, d) ⇒ c isSemanticallySmallerThan d
+      })
       def cachedIsSemanticallySmallerThan(d: ELConceptDescription): Boolean = { cache((c, d)) }
     }
 
@@ -234,18 +236,6 @@ abstract class TBoxExploration2(
                 case IgnoreAnswer()               ⇒ { ignore = true }
                 case UnsatisfiablePremiseAnswer() ⇒ { unsatisfiablePremise = true }
                 case DeclineAnswer(counterexample) ⇒ {
-                  def getImplicitCompletelySpecifiedCounterexamples(c: ELConceptDescription): Set[ELConceptDescription] = {
-                    def recurse(c: ELConceptDescription, d: Integer): Set[ELConceptDescription] = {
-                      c.getExistentialRestrictions().values().stream().reduce[Set[ELConceptDescription]](
-                        if (c.roleDepth() < d) Set(c) else Set(),
-                        (set, filler) ⇒ { set ++ recurse(filler, d - 1) },
-                        (set1, set2) ⇒ set1 ++ set2)
-                    }
-                    c.getExistentialRestrictions().values().stream().reduce[Set[ELConceptDescription]](
-                      Set(),
-                      (set, filler) ⇒ { set ++ recurse(filler, roleDepth - 1) },
-                      (set1, set2) ⇒ set1 ++ set2)
-                  }
                   val m = nextCounterexampleNumber.getAndIncrement()
                   val n = new AtomicInteger(0)
                   newCounterexample(counterexample, owlModelManager.getOWLDataFactory().getOWLNamedIndividual(IRI.create(activeOntologyIRI + "#counterexample-" + m)))
@@ -335,13 +325,45 @@ abstract class TBoxExploration2(
     }
   }
 
-  def getViolatedConceptInclusions(conceptDescription: ELConceptDescription): java.util.Set[OWLAxiom] = {
+  def getImplicitCompletelySpecifiedCounterexamples(c: ELConceptDescription): Set[ELConceptDescription] = {
+    def recurse(c: ELConceptDescription, d: Integer): Set[ELConceptDescription] = {
+      c.getExistentialRestrictions.values.stream.reduce[Set[ELConceptDescription]](
+        if (c.roleDepth < d) Set(c) else Set(),
+        (set, filler) ⇒ { set ++ recurse(filler, d - 1) },
+        (set1, set2) ⇒ set1 ++ set2)
+    }
+    c.getExistentialRestrictions.values.stream.reduce[Set[ELConceptDescription]](
+      Set(),
+      (set, filler) ⇒ { set ++ recurse(filler, roleDepth - 1) },
+      (set1, set2) ⇒ set1 ++ set2)
+  }
+
+  def getViolatedConceptInclusionsAsOWLAxioms(conceptDescription: ELConceptDescription): java.util.Set[OWLAxiom] = {
     val violatedConceptInclusions = Sets.newConcurrentHashSet[OWLAxiom]
-    repairedCIs.forEach(ci ⇒ {
-      if (!(conceptDescription satisfies ci))
-        violatedConceptInclusions add ci
+    val completelySpecifiedCounterexamples =
+      Set(conceptDescription) ++ getImplicitCompletelySpecifiedCounterexamples(conceptDescription)
+    Sets.union(staticCIs, repairedCIs).forEach(ci ⇒ {
+      //      if (!(conceptDescription satisfies ci))
+      if (completelySpecifiedCounterexamples exists { c ⇒ !(c satisfies ci) })
+        violatedConceptInclusions.add(ci)
     })
     violatedConceptInclusions
+  }
+
+  def getViolatedConceptInclusions(conceptDescription: ELConceptDescription): java.util.Set[ELConceptInclusion] = {
+    val violatedConceptInclusions = Sets.newConcurrentHashSet[ELConceptInclusion]
+    val completelySpecifiedCounterexamples =
+      Set(conceptDescription) ++ getImplicitCompletelySpecifiedCounterexamples(conceptDescription)
+    Sets.union(staticCIs, repairedCIs).forEach(ci ⇒ {
+      //      if (!(conceptDescription satisfies ci))
+      if (completelySpecifiedCounterexamples exists { c ⇒ !(c satisfies ci) })
+        violatedConceptInclusions.add(ci)
+    })
+    violatedConceptInclusions
+  }
+
+  def saturateCounterexample(counterexample: ELConceptDescription): ELConceptDescription = {
+    clopFromTBox(Sets.union(staticCIs, repairedCIs), roleDepth)(counterexample)
   }
 
   def repairedOntologyBecomesInconsistent(axiom: OWLAxiom): Boolean = {
