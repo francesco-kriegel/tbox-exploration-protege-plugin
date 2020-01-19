@@ -113,7 +113,7 @@ object Util {
     def ->(c: Boolean) = !b || c
   }
 
-  implicit class ImplicitELConceptDescription(c: ELConceptDescription) {
+  implicit class ImplicitELConceptDescription[A](c: A)(implicit f: A => ELConceptDescription) {
     def and(d: ELConceptDescription) = ELConceptDescription.conjunction(c, d)
     //    def ->(d: ELConceptDescription) = new ELConceptInclusion(c, d)
     def SubClassOf(d: ELConceptDescription) = new ELConceptInclusion(c, d)
@@ -139,11 +139,11 @@ object Util {
     }
   }
 
-  implicit class ImplicitOWLClassExpression(c: OWLClassExpression) {
-    def and(d: OWLClassExpression) = ELConceptDescription.conjunction(c, d)
-    def SubClassOf(d: OWLClassExpression) = new ELConceptInclusion(c, d)
-    def satisfies(ci: ELConceptInclusion) = (c isSubsumedBy ci.getSubsumee()) -> (c isSubsumedBy ci.getSubsumer())
-  }
+//  implicit class ImplicitOWLClassExpression(c: OWLClassExpression) {
+//    def and(d: OWLClassExpression) = ELConceptDescription.conjunction(c, d)
+//    def SubClassOf(d: OWLClassExpression) = new ELConceptInclusion(c, d)
+//    def satisfies(ci: ELConceptInclusion) = (c isSubsumedBy ci.getSubsumee()) -> (c isSubsumedBy ci.getSubsumer())
+//  }
 
   implicit class ImplicitRoleName(r: IRI) {
     def some(c: ELConceptDescription) = ELConceptDescription.existentialRestriction(r, c)
