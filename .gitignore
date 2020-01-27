@@ -1,6 +1,7 @@
+/target/
 .cache-main
 .classpath
+.project
+.settings/
 
 compile_and_run.sh
-
-/target/
