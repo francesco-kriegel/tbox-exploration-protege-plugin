@@ -2,7 +2,7 @@
  * #%L
  * TBox Exploration Protégé Plugin
  * %%
- * Copyright (C) 2019 - 2020 Francesco Kriegel
+ * Copyright (C) 2019 - 2021 Francesco Kriegel
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as
@@ -198,23 +198,57 @@ abstract class TBoxExploration2(
           }),
         signature)
 
-    val candidates = Sets.newConcurrentHashSet[ELConceptDescription]
-    candidates.add(ELConceptDescription.top())
+    class Candidate(val concept: ELConceptDescription) {
+      val successors = Sets.newConcurrentHashSet[Candidate]
+    }
+
+//    val candidates = Sets.newConcurrentHashSet[ELConceptDescription]
+    val maximalCandidates = Sets.newConcurrentHashSet[Candidate]
+
+    def addCandidate(candidate: ELConceptDescription) {
+      if (candidate.roleDepth <= roleDepth ) {
+        //      candidates.add(candidate)
+//        maximalCandidates.synchronized {
+          val nodes = maximalCandidates.parallelStream() filter { _.concept isSemanticallySmallerThan candidate } collect { Collectors.toSet[Candidate] }
+          if (nodes.isEmpty) {
+            maximalCandidates.add(new Candidate(candidate))
+          } else {
+            def sink(node: Candidate): Unit = {
+              val xs = node.successors.parallelStream() filter { _.concept isSemanticallySmallerThan candidate } collect { Collectors.toSet[Candidate] }
+              if (xs.isEmpty) {
+                node.synchronized {
+                  val ys = node.successors.parallelStream() filter { candidate isSemanticallySmallerThan _.concept } collect { Collectors.toSet[Candidate] }
+                  node.successors.removeAll(ys)
+                  val c = new Candidate(candidate)
+                  c.successors.addAll(ys)
+                  node.successors.add(c)
+                }
+              } else {
+                xs.forEach(sink(_))
+              }
+            }
+            nodes.forEach(sink(_))
+          }
+//        }
+      }
+    }
+
+    addCandidate(ELConceptDescription.top())
     var iteration = 0
-    
+
     val cache = new ConcurrentHashMap[(ELConceptDescription, ELConceptDescription), Boolean]()
     implicit class LocalImplicitELConceptDescription(c: ELConceptDescription) {
-      def cachedIsSemanticallySmallerThan(d: ELConceptDescription): Boolean = { 
+      def cachedIsSemanticallySmallerThan(d: ELConceptDescription): Boolean = {
         cache.computeIfAbsent((c, d), {
           case (c, d) ⇒ if (cache.get((d, c))) false else c isSemanticallySmallerThan d
         })
       }
     }
 
-    def isReadyForProcessing(candidate: ELConceptDescription): Boolean = {
-      candidates.parallelStream noneMatch { _ isSemanticallySmallerThan candidate }
-      // candidates.parallelStream noneMatch { _ cachedIsSemanticallySmallerThan candidate }
-    }
+//    def isReadyForProcessing(candidate: ELConceptDescription): Boolean = {
+//      candidates.parallelStream noneMatch { _ isSemanticallySmallerThan candidate }
+//      // candidates.parallelStream noneMatch { _ cachedIsSemanticallySmallerThan candidate }
+//    }
 
     def processCandidate(candidate: ELConceptDescription) {
       def checkIfRepairIsCancelled() {
@@ -284,13 +318,13 @@ abstract class TBoxExploration2(
               }
               checkIfRepairIsCancelled()
               closure_refutableCIs_staticCIs_counterexamples.lowerNeighborsB(signature).forEach(lowerNeighbor ⇒
-                if (lowerNeighbor.roleDepth() <= roleDepth) candidates.add(lowerNeighbor.reduce()))
+                if (lowerNeighbor.roleDepth() <= roleDepth) addCandidate(lowerNeighbor.reduce()))
             }
           }
         } else {
           checkIfRepairIsCancelled()
           if (!closure_repairedCIs_staticCIs.isBot())
-            candidates.add(closure_repairedCIs_staticCIs)
+            addCandidate(closure_repairedCIs_staticCIs)
           println(message)
         }
       } else {
@@ -298,7 +332,35 @@ abstract class TBoxExploration2(
       }
     }
 
-    while (!candidates.isEmpty()) {
+//    while (!candidates.isEmpty()) {
+//      if (isCancelled())
+//        throw new InterruptedException("Repair process has been interrupted.")
+//      iteration += 1
+//      println("iteration: " + iteration)
+//      setStatus("iteration: " + iteration)
+//      println("repaired TBox: " + repairedCIs)
+//      println("counterexamples: " + counterexamples)
+//      println("all candidates: " + candidates)
+//      var oldSize = candidates.size
+//      //      println("removing superfluous candidates...")
+//      //      candidates.retainAll(Collections3.representatives(candidates, ELConceptDescription.equivalence))
+//      //      println((oldSize - candidates.size) + " superfluous candidates removed.")
+//      oldSize = candidates.size
+//      println("removing candidates with role depth exceeding " + roleDepth)
+//      candidates.removeIf(_.roleDepth > roleDepth)
+//      println((oldSize - candidates.size) + " superfluous candidates removed.")
+//      println("now there are " + candidates.size + " candidates in total")
+//      println("determining candidates that are ready to be processed...")
+//      val n = new AtomicInteger(0)
+//      val total = candidates.size
+//      val currentCandidates =
+//        candidates.parallelStream map[ELConceptDescription] { c ⇒ { println("checking candidate " + n.incrementAndGet() + " of " + total + ": " + c); c } } filter { isReadyForProcessing(_) } collect { Collectors.toSet[ELConceptDescription] }
+//      println("current candidates: " + currentCandidates)
+//      println(currentCandidates.size + " candidates found for processing.")
+//      candidates.removeAll(currentCandidates)
+//      currentCandidates.parallelStream forEach { processCandidate(_) }
+//    }
+    while (!maximalCandidates.isEmpty) {
       if (isCancelled())
         throw new InterruptedException("Repair process has been interrupted.")
       iteration += 1
@@ -306,26 +368,18 @@ abstract class TBoxExploration2(
       setStatus("iteration: " + iteration)
       println("repaired TBox: " + repairedCIs)
       println("counterexamples: " + counterexamples)
-      println("all candidates: " + candidates)
-      var oldSize = candidates.size
-      //      println("removing superfluous candidates...")
-      //      candidates.retainAll(Collections3.representatives(candidates, ELConceptDescription.equivalence))
-      //      println((oldSize - candidates.size) + " superfluous candidates removed.")
-      oldSize = candidates.size
-      println("removing candidates with role depth exceeding " + roleDepth)
-      candidates.removeIf(_.roleDepth > roleDepth)
-      println((oldSize - candidates.size) + " superfluous candidates removed.")
-      println("now there are " + candidates.size + " candidates in total")
-      println("determining candidates that are ready to be processed...")
-      val n = new AtomicInteger(0)
-      val total = candidates.size
-      val currentCandidates = 
-        candidates.parallelStream map[ELConceptDescription] { c ⇒ { println("checking candidate " + n.incrementAndGet() + " of " + total + ": " + c); c } } filter { isReadyForProcessing(_) } collect { Collectors.toSet() }
+      val _maximalCandidates = Sets.newHashSet[Candidate]
+      _maximalCandidates.addAll(maximalCandidates)
+      maximalCandidates.clear()
+      _maximalCandidates.forEach(maximalCandidate => {
+        maximalCandidates.addAll(maximalCandidate.successors)
+      })
+      val currentCandidates = _maximalCandidates.stream map[ELConceptDescription] { _.concept } collect { Collectors.toSet[ELConceptDescription] }
       println("current candidates: " + currentCandidates)
       println(currentCandidates.size + " candidates found for processing.")
-      candidates.removeAll(currentCandidates)
       currentCandidates.parallelStream forEach { processCandidate(_) }
     }
+
     println("Repair finished.")
     setStatus("Repair finished.")
 
