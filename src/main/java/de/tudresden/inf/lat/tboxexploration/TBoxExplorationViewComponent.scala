@@ -319,15 +319,16 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
     //    val inputConclusionRank =
     //      allCIs.parallelStream().map[Long](_.getSubsumer.rank5).max(java.lang.Long.compare).orElse(0)
 
-    def specifyArguments(): (Object, Integer, Integer, Boolean, OWLAxiom) = {
+    def specifyArguments(): (Object, Integer, Integer, Integer, Boolean, OWLAxiom) = {
       println("asking for arguments...")
-      val roleDepthSpinner = new JSpinner(new SpinnerNumberModel(5, 0, 32, 1))
+      val roleDepthSpinner = new JSpinner(new SpinnerNumberModel(1, 0, 32, 1))
+      val conjunctionSizeSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 32, 1))
       //      val roleDepthSpinnerStatusLabel = new JLabel(" ")
       //      val maxRankCheckBox = new JCheckBox("maximal rank (deprecated)", true)
       //      val maxRankSpinner = new JSpinner(new SpinnerNumberModel(16, 0, Integer.MAX_VALUE, 1))
       val exploreRoleIncompatibilityAxiomsCheckBox = new JCheckBox(
         "<html>The ontology is not complete for role incompatibility axioms.  If selected, then you will be asked whether<br>" +
-          "some binary role compositions are unsatisfiable.  Note that this is an experimental feature.", true)
+          "some binary role compositions are unsatisfiable.  Note that this is an experimental feature.", false)
       val unwantedConsequenceCheckBox = new JCheckBox("unwanted consequence", false)
       val unwantedConsequenceAxiomEditor = new OWLGeneralAxiomEditor(getOWLEditorKit())
       val unwantedConsequenceAxiomEditorComponent = unwantedConsequenceAxiomEditor.getEditorComponent().getComponent(0)
@@ -360,6 +361,28 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
         roleDepthSpinner,
         new GridBagConstraints(
           1, 1, // gridx, gridy
+          1, 1, // gridwidth, gridheight
+          0, 0, // weightx, weighty
+          GridBagConstraints.LINE_START, // anchor
+          GridBagConstraints.HORIZONTAL, // fill
+          new Insets(0, 0, 0, 0), // insets
+          4, 4 // ipadx, ipady
+        ))
+      panel.add(
+        new JLabel("maximal conjunction size"),
+        new GridBagConstraints(
+          0, 2, // gridx, gridy
+          1, 1, // gridwidth, gridheight
+          0, 0, // weightx, weighty
+          GridBagConstraints.LINE_END, // anchor
+          GridBagConstraints.HORIZONTAL, // fill
+          new Insets(0, 0, 0, 0), // insets
+          4, 4 // ipadx, ipady
+        ))
+      panel.add(
+        conjunctionSizeSpinner,
+        new GridBagConstraints(
+          1, 2, // gridx, gridy
           1, 1, // gridwidth, gridheight
           0, 0, // weightx, weighty
           GridBagConstraints.LINE_START, // anchor
@@ -403,7 +426,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       panel.add(
         exploreRoleIncompatibilityAxiomsCheckBox,
         new GridBagConstraints(
-          0, 2, // gridx, gridy
+          0, 3, // gridx, gridy
           2, 1, // gridwidth, gridheight
           0, 0, // weightx, weighty
           GridBagConstraints.CENTER, // anchor
@@ -414,7 +437,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       panel.add(
         unwantedConsequenceCheckBox,
         new GridBagConstraints(
-          0, 3, // gridx, gridy
+          0, 4, // gridx, gridy
           1, 1, // gridwidth, gridheight
           0, 0, // weightx, weighty
           GridBagConstraints.FIRST_LINE_START, // anchor
@@ -428,7 +451,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
           ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
           ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED),
         new GridBagConstraints(
-          1, 3, // gridx, gridy
+          1, 4, // gridx, gridy
           1, 1, // gridwidth, gridheight
           1, 1, // weightx, weighty
           GridBagConstraints.CENTER, // anchor
@@ -439,7 +462,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       panel.add(
         unwantedConsequenceStatusLabel,
         new GridBagConstraints(
-          1, 4, // gridx, gridy
+          1, 5, // gridx, gridy
           1, 1, // gridwidth, gridheight
           0, 0, // weightx, weighty
           GridBagConstraints.LINE_START, // anchor
@@ -523,6 +546,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       okButton.addActionListener(_ ⇒ {
         try {
           roleDepthSpinner.commitEdit()
+          conjunctionSizeSpinner.commitEdit()
           //          maxRankSpinner.commitEdit()
           pane.setValue(JOptionPane.OK_OPTION)
         } catch {
@@ -542,13 +566,14 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       (
         pane.getValue(),
         roleDepthSpinner.getValue().asInstanceOf[Integer],
+        conjunctionSizeSpinner.getValue.asInstanceOf[Integer],
         Integer.MAX_VALUE, // if (maxRankCheckBox.isSelected()) maxRankSpinner.getValue().asInstanceOf[Integer] else Integer.MAX_VALUE,
         exploreRoleIncompatibilityAxiomsCheckBox.isSelected(),
         axiom)
 
     }
 
-    val (value, roleDepth, maxRank, exploreRoleIncompatibilityAxioms, unwantedConsequence) = specifyArguments()
+    val (value, roleDepth, conjunctionSize, maxRank, exploreRoleIncompatibilityAxioms, unwantedConsequence) = specifyArguments()
 
     //    val roleDepth = Integer.valueOf(JOptionPane.showInputDialog("Specify the maximal role depth", 2))
     //    val maxRank = Integer.valueOf(JOptionPane.showInputDialog("Specify the maximal rank", 16))
@@ -641,6 +666,7 @@ class TBoxExplorationViewComponent extends AbstractOWLViewComponent {
       exploration =
         new TBoxExploration2(
           roleDepth,
+          conjunctionSize,
           maxRank,
           exploreRoleIncompatibilityAxioms,
           ontology,
