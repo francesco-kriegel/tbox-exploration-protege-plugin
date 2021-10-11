@@ -92,7 +92,7 @@ abstract class TBoxExploration2(
     counterexamples.clear()
     counterexampleInterpretation = new ELInterpretation2[ELConceptDescription]
 
-    val activeOntologyIRI = if (ontology.getOntologyID().getOntologyIRI().get() == null) "" else ontology.getOntologyID().getOntologyIRI().get().toString()
+    val activeOntologyIRI = if (!ontology.getOntologyID.getOntologyIRI.isPresent) "" else ontology.getOntologyID.getOntologyIRI.get.toString
 
     val signature = new Signature(IRI.create(""))
     var j = -1
